@@ -31,6 +31,25 @@ resource "aws_security_group" "prod-public-remote-sg" {
   }
 }
 
+resource "aws_security_group" "prod-prometheus-sg" {
+  name        = "PROD-Prometheus-SG"
+  description = "Allow Access to Prometheus"
+  vpc_id      = data.aws_vpc.prod-vpc.id
+
+  ingress {
+    from_port   = 9090
+    to_port     = 9090
+    protocol    = "tcp"
+    cidr_blocks = ["${chomp(data.http.my_public_ip.response_body)}/32"]
+  }
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+}
+
 resource "aws_instance" "prod_webserver" {
   ami           = var.ubuntu-ami-id 
   instance_type = var.instance-type
@@ -52,5 +71,16 @@ resource "aws_instance" "prod_webserver-02" {
   user_data = file("nginx.sh")
   tags = {
     Name = "PROD-Web-Server-02"
+  }
+}
+
+resource "aws_instance" "prod_prometheus" {
+  ami           = var.ubuntu-ami-id 
+  instance_type = var.instance-type
+  key_name      = data.aws_key_pair.dev_key_pair.key_name
+  subnet_id     = data.aws_subnet.prod-ec2-pub-subnet02.id
+  vpc_security_group_ids = [aws_security_group.prod-public-remote-sg.id,aws_security_group.prod-prometheus-sg.id]
+  tags = {
+    Name = "PROD-Prometheus"
   }
 }
